@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Carrera Animal Ultimate</title>
+<style>
+body { margin:0; overflow:hidden; background:black; font-family:Arial }
+canvas { display:block }
+#hud {
+  position:fixed; top:10px; left:10px;
+  color:white; font-size:16px;
+  background:rgba(0,0,0,.4);
+  padding:8px; border-radius:8px;
+}
+#ui {
+  position:fixed; top:10px; right:10px;
+}
+button { padding:6px 10px; font-size:14px; cursor:pointer }
+</style>
+</head>
+<body>
+
+<div id="hud"></div>
+<div id="ui">
+  <button onclick="cambiarAnimal()">Cambiar animal</button>
+</div>
+
+<canvas id="game"></canvas>
+
+<audio id="salto" src="https://cdn.pixabay.com/audio/2022/03/15/audio_7e2e41b6b2.mp3"></audio>
+<audio id="golpe" src="https://cdn.pixabay.com/audio/2022/03/10/audio_aa43d7c5a4.mp3"></audio>
+<audio id="power" src="https://cdn.pixabay.com/audio/2022/03/22/audio_8f8c8c0b38.mp3"></audio>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+let suelo = () => canvas.height - 90;
+let gravedad = 0.7;
+let velocidad = 7;
+let scroll = 0;
+
+const animales = [
+  {nombre:"Pollo", color:"#fff1a8", size:18, salto:20},
+  {nombre:"Gato", color:"orange", size:22, salto:18},
+  {nombre:"Burro", color:"#777", size:26, salto:17},
+  {nombre:"Oso", color:"#5a3a1a", size:32, salto:16},
+  {nombre:"Lobo", color:"#999", size:24, salto:18}
+];
+
+let animalIndex = 0;
+let player = {};
+let enemigos = [];
+let voladores = [];
+let objetos = [];
+let puntuacion = 0;
+let vidas = 3;
+let nivel = 1;
+let bioma = "Ciudad";
+let jefe = null;
+
+function resetJugador(){
+  let a = animales[animalIndex];
+  player = {
+    x: canvas.width * 0.2,
+    y: suelo(),
+    vy: 0,
+    size: a.size,
+    salto: a.salto,
+    shield:false,
+    enSuelo:true
+  };
+}
+resetJugador();
+
+document.addEventListener("keydown", e=>{
+  if(e.code==="Space" && player.enSuelo){
+    player.vy = -player.salto;
+    player.enSuelo = false;
+    salto.play();
+  }
+});
+
+function cambiarAnimal(){
+  animalIndex = (animalIndex+1)%animales.length;
+  resetJugador();
+}
+
+function actualizarBioma(){
+  if(nivel<4) bioma="Ciudad";
+  else if(nivel<7) bioma="Bosque";
+  else bioma="Desierto";
+}
+
+function fondo(){
+  scroll -= velocidad/2;
+
+  if(bioma==="Ciudad"){
+    ctx.fillStyle="#444";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#222";
+    for(let i=0;i<canvas.width;i+=120)
+      ctx.fillRect(i+scroll%120,canvas.height-220,80,220);
+  }
+  if(bioma==="Bosque"){
+    ctx.fillStyle="#2c6";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#173";
+    for(let i=0;i<canvas.width;i+=100)
+      ctx.fillRect(i+scroll%100,canvas.height-240,20,240);
+  }
+  if(bioma==="Desierto"){
+    ctx.fillStyle="#e0c27a";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#b38b3c";
+    for(let i=0;i<canvas.width;i+=140)
+      ctx.fillRect(i+scroll%140,canvas.height-160,20,160);
+  }
+
+  ctx.fillStyle="#333";
+  ctx.fillRect(0,suelo(),canvas.width,canvas.height);
+}
+
+function dibujarAnimal(){
+  let a = animales[animalIndex];
+  ctx.fillStyle=a.color;
+  ctx.fillRect(player.x-player.size,player.y-player.size,player.size*2,player.size);
+  ctx.beginPath();
+  ctx.arc(player.x,player.y-player.size,player.size/1.5,0,Math.PI*2);
+  ctx.fill();
+}
+
+function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  fondo();
+
+  player.vy+=gravedad;
+  player.y+=player.vy;
+  if(player.y>=suelo()){
+    player.y=suelo();
+    player.vy=0;
+    player.enSuelo=true;
+  }
+
+  dibujarAnimal();
+
+  puntuacion++;
+  if(puntuacion%500===0){
+    nivel++;
+    velocidad+=0.4;
+    actualizarBioma();
+    enemigos.push({x:canvas.width+50,y:suelo(),size:22});
+    voladores.push({x:canvas.width+100,y:suelo()-120});
+    objetos.push({x:canvas.width+200,y:suelo()-40});
+    if(nivel===9) jefe={x:canvas.width+300,y:suelo(),vida:15};
+  }
+
+  enemigos.forEach(e=>{
+    e.x-=velocidad;
+    ctx.fillStyle="red";
+    ctx.beginPath(); ctx.arc(e.x,e.y,e.size,0,Math.PI*2); ctx.fill();
+    if(Math.hypot(player.x-e.x,player.y-e.y)<player.size+e.size){
+      golpe.play();
+      if(player.shield){ player.shield=false; e.x=-100 }
+      else { vidas--; e.x=-100 }
+    }
+  });
+
+  voladores.forEach(v=>{
+    v.x-=velocidad+1;
+    ctx.fillStyle="black";
+    ctx.fillRect(v.x-15,v.y-10,30,20);
+  });
+
+  objetos.forEach(o=>{
+    o.x-=velocidad;
+    ctx.fillStyle="cyan";
+    ctx.fillRect(o.x-10,o.y-10,20,20);
+    if(Math.abs(player.x-o.x)<25){
+      player.shield=true;
+      power.play();
+      o.x=-100;
+    }
+  });
+
+  if(jefe){
+    jefe.x-=2;
+    ctx.fillStyle="purple";
+    ctx.fillRect(jefe.x-50,jefe.y-50,100,50);
+    if(Math.abs(player.x-jefe.x)<60){
+      if(player.shield){ jefe.vida--; player.shield=false }
+      else vidas--;
+    }
+    if(jefe.vida<=0){
+      alert("🏆 HAS GANADO");
+      location.reload();
+    }
+  }
+
+  document.getElementById("hud").innerHTML=
+  `🐾 ${animales[animalIndex].nombre}<br>
+   ⭐ ${puntuacion}<br>
+   ❤️ ${vidas}<br>
+   🌍 ${bioma}`;
+
+  if(vidas>0) requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
