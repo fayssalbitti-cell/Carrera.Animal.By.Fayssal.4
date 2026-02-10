@@ -2,20 +2,20 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Carrera Animal Ultimate</title>
+<title>Carrera Animal</title>
 <style>
 body { margin:0; overflow:hidden; background:black; font-family:Arial }
 canvas { display:block }
 #hud {
   position:fixed; top:10px; left:10px;
-  color:white; font-size:16px;
+  color:white; font-size:15px;
   background:rgba(0,0,0,.4);
   padding:8px; border-radius:8px;
 }
 #ui {
   position:fixed; top:10px; right:10px;
 }
-button { padding:6px 10px; font-size:14px; cursor:pointer }
+button { padding:6px 10px; font-size:14px }
 </style>
 </head>
 <body>
@@ -26,10 +26,6 @@ button { padding:6px 10px; font-size:14px; cursor:pointer }
 </div>
 
 <canvas id="game"></canvas>
-
-<audio id="salto" src="https://cdn.pixabay.com/audio/2022/03/15/audio_7e2e41b6b2.mp3"></audio>
-<audio id="golpe" src="https://cdn.pixabay.com/audio/2022/03/10/audio_aa43d7c5a4.mp3"></audio>
-<audio id="power" src="https://cdn.pixabay.com/audio/2022/03/22/audio_8f8c8c0b38.mp3"></audio>
 
 <script>
 const canvas = document.getElementById("game");
@@ -48,23 +44,19 @@ let velocidad = 7;
 let scroll = 0;
 
 const animales = [
-  {nombre:"Pollo", color:"#fff1a8", size:18, salto:20},
-  {nombre:"Gato", color:"orange", size:22, salto:18},
-  {nombre:"Burro", color:"#777", size:26, salto:17},
-  {nombre:"Oso", color:"#5a3a1a", size:32, salto:16},
-  {nombre:"Lobo", color:"#999", size:24, salto:18}
+  {nombre:"Pollo", tipo:"pollo", size:18, salto:20, color:"#fff2a8"},
+  {nombre:"Gato", tipo:"gato", size:22, salto:18, color:"orange"},
+  {nombre:"Burro", tipo:"burro", size:26, salto:17, color:"#777"},
+  {nombre:"Oso", tipo:"oso", size:32, salto:16, color:"#5a3a1a"},
+  {nombre:"Lobo", tipo:"lobo", size:24, salto:18, color:"#aaa"}
 ];
 
 let animalIndex = 0;
 let player = {};
-let enemigos = [];
-let voladores = [];
-let objetos = [];
 let puntuacion = 0;
 let vidas = 3;
 let nivel = 1;
 let bioma = "Ciudad";
-let jefe = null;
 
 function resetJugador(){
   let a = animales[animalIndex];
@@ -74,7 +66,6 @@ function resetJugador(){
     vy: 0,
     size: a.size,
     salto: a.salto,
-    shield:false,
     enSuelo:true
   };
 }
@@ -83,8 +74,7 @@ resetJugador();
 document.addEventListener("keydown", e=>{
   if(e.code==="Space" && player.enSuelo){
     player.vy = -player.salto;
-    player.enSuelo = false;
-    salto.play();
+    player.enSuelo=false;
   }
 });
 
@@ -107,21 +97,27 @@ function fondo(){
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle="#222";
     for(let i=0;i<canvas.width;i+=120)
-      ctx.fillRect(i+scroll%120,canvas.height-220,80,220);
+      ctx.fillRect(i+(scroll%120),canvas.height-240,80,240);
   }
+
   if(bioma==="Bosque"){
     ctx.fillStyle="#2c6";
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle="#173";
-    for(let i=0;i<canvas.width;i+=100)
-      ctx.fillRect(i+scroll%100,canvas.height-240,20,240);
+    for(let i=0;i<canvas.width;i+=100){
+      ctx.fillRect(i+(scroll%100),canvas.height-260,20,260);
+      ctx.beginPath();
+      ctx.arc(i+(scroll%100)+10,canvas.height-260,40,0,Math.PI*2);
+      ctx.fill();
+    }
   }
+
   if(bioma==="Desierto"){
     ctx.fillStyle="#e0c27a";
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle="#b38b3c";
     for(let i=0;i<canvas.width;i+=140)
-      ctx.fillRect(i+scroll%140,canvas.height-160,20,160);
+      ctx.fillRect(i+(scroll%140),canvas.height-160,20,160);
   }
 
   ctx.fillStyle="#333";
@@ -131,10 +127,45 @@ function fondo(){
 function dibujarAnimal(){
   let a = animales[animalIndex];
   ctx.fillStyle=a.color;
+
+  // CUERPO
   ctx.fillRect(player.x-player.size,player.y-player.size,player.size*2,player.size);
+
+  // CABEZA
   ctx.beginPath();
-  ctx.arc(player.x,player.y-player.size,player.size/1.5,0,Math.PI*2);
+  ctx.arc(player.x,player.y-player.size,player.size/1.4,0,Math.PI*2);
   ctx.fill();
+
+  // FORMAS ESPECIALES
+  if(a.tipo==="pollo"){ // pico + cresta
+    ctx.fillStyle="orange";
+    ctx.fillRect(player.x+player.size-2,player.y-player.size-4,10,6);
+    ctx.fillStyle="red";
+    ctx.fillRect(player.x-3,player.y-player.size*2,6,10);
+  }
+
+  if(a.tipo==="gato"){ // orejas + cola
+    ctx.fillRect(player.x-14,player.y-player.size*2,6,10);
+    ctx.fillRect(player.x+8,player.y-player.size*2,6,10);
+    ctx.fillRect(player.x-player.size-10,player.y-player.size+6,10,4);
+  }
+
+  if(a.tipo==="burro"){ // orejas largas
+    ctx.fillRect(player.x-12,player.y-player.size*2,6,18);
+    ctx.fillRect(player.x+6,player.y-player.size*2,6,18);
+  }
+
+  if(a.tipo==="oso"){ // cuerpo grande
+    ctx.beginPath();
+    ctx.arc(player.x-10,player.y-player.size,player.size/2,0,Math.PI*2);
+    ctx.arc(player.x+10,player.y-player.size,player.size/2,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  if(a.tipo==="lobo"){ // hocico + cola larga
+    ctx.fillRect(player.x+player.size-2,player.y-player.size,14,6);
+    ctx.fillRect(player.x-player.size-18,player.y-player.size+6,18,4);
+  }
 }
 
 function loop(){
@@ -156,52 +187,6 @@ function loop(){
     nivel++;
     velocidad+=0.4;
     actualizarBioma();
-    enemigos.push({x:canvas.width+50,y:suelo(),size:22});
-    voladores.push({x:canvas.width+100,y:suelo()-120});
-    objetos.push({x:canvas.width+200,y:suelo()-40});
-    if(nivel===9) jefe={x:canvas.width+300,y:suelo(),vida:15};
-  }
-
-  enemigos.forEach(e=>{
-    e.x-=velocidad;
-    ctx.fillStyle="red";
-    ctx.beginPath(); ctx.arc(e.x,e.y,e.size,0,Math.PI*2); ctx.fill();
-    if(Math.hypot(player.x-e.x,player.y-e.y)<player.size+e.size){
-      golpe.play();
-      if(player.shield){ player.shield=false; e.x=-100 }
-      else { vidas--; e.x=-100 }
-    }
-  });
-
-  voladores.forEach(v=>{
-    v.x-=velocidad+1;
-    ctx.fillStyle="black";
-    ctx.fillRect(v.x-15,v.y-10,30,20);
-  });
-
-  objetos.forEach(o=>{
-    o.x-=velocidad;
-    ctx.fillStyle="cyan";
-    ctx.fillRect(o.x-10,o.y-10,20,20);
-    if(Math.abs(player.x-o.x)<25){
-      player.shield=true;
-      power.play();
-      o.x=-100;
-    }
-  });
-
-  if(jefe){
-    jefe.x-=2;
-    ctx.fillStyle="purple";
-    ctx.fillRect(jefe.x-50,jefe.y-50,100,50);
-    if(Math.abs(player.x-jefe.x)<60){
-      if(player.shield){ jefe.vida--; player.shield=false }
-      else vidas--;
-    }
-    if(jefe.vida<=0){
-      alert("🏆 HAS GANADO");
-      location.reload();
-    }
   }
 
   document.getElementById("hud").innerHTML=
@@ -210,7 +195,7 @@ function loop(){
    ❤️ ${vidas}<br>
    🌍 ${bioma}`;
 
-  if(vidas>0) requestAnimationFrame(loop);
+  requestAnimationFrame(loop);
 }
 loop();
 </script>
